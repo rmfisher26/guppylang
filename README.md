@@ -62,7 +62,7 @@ pip install guppylang
 
 See [DEVELOPMENT.md](https://github.com/quantinuum/guppylang/blob/main/DEVELOPMENT.md) for instructions on setting up the development environment.
 
-## License
+## License ##
 
 This project is licensed under Apache License, Version 2.0 ([LICENCE][] or <http://www.apache.org/licenses/LICENSE-2.0>).
 
