@@ -61,7 +61,7 @@ class array(builtins.list[_T], Generic[_T, _n]):
     @custom_function(ArrayGetitemCompiler(), checker=ArrayIndexChecker())
     def __getitem__(self: array[L, n], idx: int) -> L: ...
 
-    @custom_function(ArraySetitemCompiler())
+    @custom_function(ArraySetitemCompiler(), checker=ArrayIndexChecker())
     def __setitem__(self: array[L, n], idx: int, value: L @ owned) -> None: ...
 
     @guppy
@@ -106,7 +106,7 @@ class array(builtins.list[_T], Generic[_T, _n]):
         ```
         """
 
-    @custom_function(ArrayGetitemCompiler())
+    @custom_function(ArrayGetitemCompiler(), checker=ArrayIndexChecker())
     def take(self: array[L, n], idx: int) -> L:
         """Takes an element out of the array.
 
@@ -169,7 +169,7 @@ class array(builtins.list[_T], Generic[_T, _n]):
             return nothing()
         return some(self.take(idx))
 
-    @custom_function(ArraySetitemCompiler(elem_first=True))
+    @custom_function(ArraySetitemCompiler(elem_first=True), checker=ArrayIndexChecker())
     def put(self: array[L, n], elem: L @ owned, idx: int) -> None:
         """Puts an element back into the array if it has been taken out previously.
 
