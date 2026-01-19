@@ -220,29 +220,25 @@ class ArrayIndexChecker(CustomCallChecker):
 
         # Extract the array length from type arguments
         # Type args are: [element_type, length]
-        if len(type_args) >= 2:
-            length_arg = type_args[1]
+        length_arg = type_args[1]
 
-            # Check if the array size is statically known
-            if hasattr(length_arg, "const") and isinstance(
-                length_arg.const, ConstValue
+        # Check if the array size is statically known
+        if hasattr(length_arg, "const") and isinstance(length_arg.const, ConstValue):
+            array_length = length_arg.const.value
+
+            # The index is the second argument (first is self/array)
+            index_value = self._extract_constant_index(args[1])
+
+            if index_value is not None and (
+                index_value < 0 or index_value >= array_length
             ):
-                array_length = length_arg.const.value
-
-                # The index is the second argument (first is self/array)
-                if len(args) >= 2:
-                    index_value = self._extract_constant_index(args[1])
-
-                    if index_value is not None and (
-                        index_value < 0 or index_value >= array_length
-                    ):
-                        raise GuppyError(
-                            ArrayIndexChecker.IndexOutOfBoundsError(
-                                self.node,
-                                index=index_value,
-                                size=array_length,
-                            )
-                        )
+                raise GuppyError(
+                    ArrayIndexChecker.IndexOutOfBoundsError(
+                        self.node,
+                        index=index_value,
+                        size=array_length,
+                    )
+                )
 
         # Return the synthesized node and type
         node = GlobalCall(def_id=self.func.id, args=args, type_args=type_args)
@@ -255,30 +251,25 @@ class ArrayIndexChecker(CustomCallChecker):
 
         # Extract the array length from type arguments
         # Type args are: [element_type, length]
-        if len(type_args) >= 2:
-            length_arg = type_args[1]
+        length_arg = type_args[1]
 
-            # Check if the array size is statically known
-            if hasattr(length_arg, "const") and isinstance(
-                length_arg.const, ConstValue
+        # Check if the array size is statically known
+        if hasattr(length_arg, "const") and isinstance(length_arg.const, ConstValue):
+            array_length = length_arg.const.value
+
+            # The index is the second argument (first is self/array)
+            index_value = self._extract_constant_index(args[1])
+
+            if index_value is not None and (
+                index_value < 0 or index_value >= array_length
             ):
-                array_length = length_arg.const.value
-
-                # The index is the second argument (first is self/array)
-                if len(args) >= 2:
-                    index_value = self._extract_constant_index(args[1])
-
-                    # Perform bounds check
-                    if index_value is not None and (
-                        index_value < 0 or index_value >= array_length
-                    ):
-                        raise GuppyError(
-                            ArrayIndexChecker.IndexOutOfBoundsError(
-                                self.node,
-                                index=index_value,
-                                size=array_length,
-                            )
-                        )
+                raise GuppyError(
+                    ArrayIndexChecker.IndexOutOfBoundsError(
+                        self.node,
+                        index=index_value,
+                        size=array_length,
+                    )
+                )
 
         # Return the synthesized node and type
         node = GlobalCall(def_id=self.func.id, args=args, type_args=type_args)
