@@ -15,7 +15,6 @@ from guppylang.std.quantum import qubit, measure, h, discard_array
 
 
 def test_index_equals_array_size():
-    """Test index equal to array size (first invalid index)."""
 
     @guppy
     def main() -> int:
