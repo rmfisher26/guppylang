@@ -86,7 +86,7 @@ class array(builtins.list[_T], Generic[_T, _n]):
     def copy(self: array[T, n]) -> array[T, n]:
         """Copy an array instance. Will only work if T is a copyable type."""
 
-    @custom_function(ArrayIsBorrowedCompiler())
+    @custom_function(ArrayIsBorrowedCompiler(), checker=ArrayIndexChecker())
     def is_borrowed(self: array[L, n], idx: int) -> bool:
         """Checks if an element has been taken out of the array.
 
