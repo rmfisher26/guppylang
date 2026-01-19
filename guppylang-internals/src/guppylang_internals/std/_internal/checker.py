@@ -231,12 +231,8 @@ class ArrayIndexChecker(CustomCallChecker):
 
                 # The index is the second argument (first is self/array)
                 if len(args) >= 2:
-                    index_expr = args[1]
+                    index_value = self._extract_constant_index(args[1])
 
-                    # Extract constant index value
-                    index_value = self._extract_constant_index(index_expr)
-
-                    # Perform bounds check
                     if index_value is not None and (
                         index_value < 0 or index_value >= array_length
                     ):
