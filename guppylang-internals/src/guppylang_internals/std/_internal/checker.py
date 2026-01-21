@@ -249,7 +249,9 @@ class ArrayIndexChecker(CustomCallChecker):
         args, subs, type_args = check_call(self.func.ty, args, ty, self.node, self.ctx)
 
         # Check the index bounds (first:index expression, second: length_arg)
-        self._check_constant_index_bounds(args[1], type_args[1])
+        # Check args[1] and args[2] both against type_args[1]
+        for index_expr in args[1:3]:
+            self._check_constant_index_bounds(index_expr, type_args[1])
 
         # Return the synthesized node and type
         node = GlobalCall(def_id=self.func.id, args=args, type_args=type_args)
@@ -261,7 +263,9 @@ class ArrayIndexChecker(CustomCallChecker):
         args, ty, type_args = synthesize_call(self.func.ty, args, self.node, self.ctx)
 
         # Check the index bounds (first:index expression, second: length_arg)
-        self._check_constant_index_bounds(args[1], type_args[1])
+        # Check args[1] and args[2] both against type_args[1]
+        for index_expr in args[1:3]:
+            self._check_constant_index_bounds(index_expr, type_args[1])
 
         # Return the synthesized node and type
         node = GlobalCall(def_id=self.func.id, args=args, type_args=type_args)
