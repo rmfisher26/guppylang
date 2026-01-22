@@ -223,15 +223,12 @@ class ArrayIndexChecker(CustomCallChecker):
         ):
             return
 
-        # get the array length
         array_length = length_arg.const.value
 
-        # Extract constant index if possible
         index_value = self._extract_constant_index(index_expr)
         if index_value is None:
             return
 
-        # Perform bounds check
         if index_value < 0 or index_value >= array_length:
             raise GuppyError(
                 ArrayIndexChecker.IndexOutOfBoundsError(

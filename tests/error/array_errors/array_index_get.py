@@ -9,6 +9,3 @@ def main() -> None:
    discard_array(qs)
 
 main.compile()
-
-
-

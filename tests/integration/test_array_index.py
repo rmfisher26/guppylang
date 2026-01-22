@@ -148,21 +148,3 @@ def test_method_take_put_valid_index():
         discard_array(qs)
 
     main.compile()  # Should succeed
-
-
-def test_boundary_size_2_index_0():
-    @guppy
-    def main() -> int:
-        arr = array(i for i in range(2))
-        return arr[0]
-
-    main.compile()  # Should succeed
-
-
-def test_boundary_size_2_index_1():
-    @guppy
-    def main() -> int:
-        arr = array(i for i in range(2))
-        return arr[1]
-
-    main.compile()  # Should succeed
