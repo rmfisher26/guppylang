@@ -1,6 +1,5 @@
 """
 Comprehensive unit tests for ArrayIndexChecker class.
-Tests cover all edge cases, both valid and invalid scenarios.
 """
 
 from guppylang import guppy
