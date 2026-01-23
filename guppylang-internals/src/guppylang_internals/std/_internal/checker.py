@@ -5,7 +5,7 @@ from typing import ClassVar
 from typing_extensions import assert_never
 
 from guppylang_internals.ast_util import get_type, with_loc, with_type
-from guppylang_internals.checker.core import Context
+from guppylang_internals.checker.core import Context, Variable
 from guppylang_internals.checker.errors.generic import UnsupportedError
 from guppylang_internals.checker.errors.type_errors import (
     ArrayComprUnknownSizeError,
@@ -33,6 +33,7 @@ from guppylang_internals.nodes import (
     GlobalCall,
     MakeIter,
     PanicExpr,
+    PlaceNode,
 )
 from guppylang_internals.tys.arg import ConstArg, TypeArg
 from guppylang_internals.tys.builtin import (
@@ -202,16 +203,15 @@ class ArrayIndexChecker(CustomCallChecker):
 
         Handles both AST constants and PlaceNode structures.
         """
-        # Case 1: Simple AST constant (e.g., arr[8] - direct Constant node)
+        # Case 1: Simple AST constant (e.g., arr.take(0))
         if isinstance(index_expr, ast.Constant) and isinstance(index_expr.value, int):
             return index_expr.value
 
-        # Case 2: PlaceNode with constant defined_at (e.g., after type checking)
-        if hasattr(index_expr, "place"):
+        # Case 2: Subscript accesses (e.g., arr[0])
+        if isinstance(index_expr, PlaceNode):
             place = index_expr.place
-            if hasattr(place, "defined_at"):
+            if isinstance(place, Variable):
                 defined_at = place.defined_at
-                # Check if defined_at is a Constant node with a value
                 if isinstance(defined_at, ast.Constant) and isinstance(
                     defined_at.value, int
                 ):
