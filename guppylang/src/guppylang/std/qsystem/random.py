@@ -95,8 +95,6 @@ class RNG:
         for k in range(SHUFFLE_N):
             i = SHUFFLE_N - 1 - k
             j = self.random_int_bounded(i + 1)
-            # TODO use array swap once lowering implemented
-            # https://github.com/quantinuum/guppylang/issues/924
             if i != j:
                 array_swap(array, i, j)
 
