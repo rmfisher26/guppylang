@@ -1,0 +1,16 @@
+Error: Linearity violation (at $FILE:9:10)
+  | 
+7 |   qs = array(qubit() for _ in range(10))
+8 |   q1 = qs[0]
+9 |   q2 = qs[0]
+  |           ^ Linear value at index 0 used multiple times
+
+Note:
+  | 
+7 |   qs = array(qubit() for _ in range(10))
+8 |   q1 = qs[0]
+  |           -
+
+Note: First use was here
+
+Guppy compilation failed due to 1 previous error

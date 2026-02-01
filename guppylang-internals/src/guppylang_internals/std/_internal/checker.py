@@ -1,4 +1,5 @@
 import ast
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import ClassVar
 
@@ -190,12 +191,27 @@ class ArrayIndexChecker(CustomCallChecker):
         index: int
         size: int
 
+    @dataclass(frozen=True)
+    class LinearityViolationError(Error):
+        title: ClassVar[str] = "Linearity violation"
+        span_label: ClassVar[str] = "Linear value at index {index} used multiple times"
+        index: int
+        first_use_location: ast.AST | None = None
+
+        @dataclass(frozen=True)
+        class FirstUseNote(Note):
+            message: ClassVar[str] = "First use was here"
+
     def __init__(self, *, expr_index: int = 1):
         """
         Args:
             expr_index: Position of the expression index argument (0 based)
         """
         self.expr_index: int = expr_index
+
+        # Track which literal indices have been used for linear arrays
+        # Maps: (array_var_id, literal_index) -> first_use_node
+        self.literal_index_usage: dict[tuple[int, int], ast.expr] = {}
 
     def _extract_constant_index(self, index_expr: ast.expr) -> int | None:
         """Extract a constant integer value from an index expression if possible.
@@ -217,6 +233,76 @@ class ArrayIndexChecker(CustomCallChecker):
                     return defined_at.value
 
         return None
+
+    def _get_array_variable_id(self, array_expr: ast.expr) -> int | None:
+        """Extract a unique identifier for the array variable."""
+        # For simple variable access
+        if isinstance(array_expr, ast.Name):
+            return id(array_expr.id)  # Use string hash as ID
+
+        # For PlaceNode (e.g., function parameters)
+        if isinstance(array_expr, PlaceNode):
+            place = array_expr.place
+            if isinstance(place, Variable):
+                return id(place)  # Use Variable object id
+
+        return None
+
+    def _is_linear_element_type(
+        self, array_type_args: Sequence[TypeArg | ConstArg]
+    ) -> bool:
+        """Check if the array's element type is linear."""
+        if not array_type_args:
+            return False
+
+        # First type arg is the element type
+        elem_arg = array_type_args[0]
+        if isinstance(elem_arg, TypeArg):
+            elem_ty = elem_arg.ty
+            # Check if type has the 'copyable' property
+            return not elem_ty.copyable
+
+        return False
+
+    def _check_linearity_for_literal_index(
+        self,
+        array_expr: ast.expr,
+        index_expr: ast.expr,
+        type_args: Sequence[TypeArg | ConstArg],
+    ) -> None:
+        """Check if we're reusing a literal index on a linear array."""
+
+        # Only check if element type is linear
+        if not self._is_linear_element_type(type_args):
+            return
+
+        # Extract literal index value
+        index_value = self._extract_constant_index(index_expr)
+        if index_value is None:
+            return  # Not a literal index, can't check
+
+        # Extract array variable identifier
+        array_id = self._get_array_variable_id(array_expr)
+        if array_id is None:
+            return  # Can't identify the array uniquely
+
+        # Check if this (array, index) pair was already used
+        key = (array_id, index_value)
+
+        if key in self.literal_index_usage:
+            # VIOLATION: Same index used twice!
+            first_use = self.literal_index_usage[key]
+            err = ArrayIndexChecker.LinearityViolationError(
+                index_expr, index=index_value
+            )
+            # Add note showing where it was first used
+            err.add_sub_diagnostic(
+                ArrayIndexChecker.LinearityViolationError.FirstUseNote(first_use)
+            )
+            raise GuppyTypeError(err)
+
+        # Record this usage
+        self.literal_index_usage[key] = index_expr
 
     def _check_constant_index_bounds(
         self, index_expr: ast.expr, length_arg: TypeArg | ConstArg
@@ -255,6 +341,14 @@ class ArrayIndexChecker(CustomCallChecker):
         # Check the index bounds (first:index expression, second: length_arg)
         self._check_constant_index_bounds(args[self.expr_index], type_args[1])
 
+        # Check linearity for literal indices
+        # args[0] is the array, args[self.expr_index] is the index
+        self._check_linearity_for_literal_index(
+            args[0],  # array expression
+            args[self.expr_index],  # index expression
+            type_args,  # type arguments (includes element type)
+        )
+
         # Return the synthesized node and type
         node = GlobalCall(def_id=self.func.id, args=args, type_args=type_args)
         return with_loc(self.node, node), subs
@@ -266,6 +360,14 @@ class ArrayIndexChecker(CustomCallChecker):
 
         # Check the index bounds (first:index expression, second: length_arg)
         self._check_constant_index_bounds(args[self.expr_index], type_args[1])
+
+        # Check linearity for literal indices
+        # args[0] is the array, args[self.expr_index] is the index
+        self._check_linearity_for_literal_index(
+            args[0],  # array expression
+            args[self.expr_index],  # index expression
+            type_args,  # type arguments (includes element type)
+        )
 
         # Return the synthesized node and type
         node = GlobalCall(def_id=self.func.id, args=args, type_args=type_args)
