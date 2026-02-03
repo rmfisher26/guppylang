@@ -21,6 +21,7 @@ can be used to infer a type for an expression.
 """
 
 import ast
+import copy
 import sys
 import traceback
 from collections.abc import Sequence
@@ -1180,19 +1181,25 @@ def check_call(
     #  However the bad case, e.g. `x: int = foo(foo(...foo(?)...))`, shouldn't be common
     #  in practice. Can we do better than that?
 
-    # First, try to synthesize
-    res: tuple[Type, Inst] | None = None
+    # synthesize_call may modify args and node in place,
+    # hence we deepcopy them before passing in the function
+    node_copy = copy.deepcopy(node)
+    inputs_copy = copy.deepcopy(inputs)
+
     try:
         inputs, synth, inst = synthesize_call(func_ty, inputs, node, ctx)
-        res = synth, inst
-    except GuppyTypeInferenceError:
-        pass
-    if res is not None:
-        synth, inst = res
         subst = unify(ty, synth, {})
         if subst is None:
             raise GuppyTypeError(TypeMismatchError(node, ty, synth, kind))
-        return inputs, subst, inst
+        else:
+            return inputs, subst, inst
+    except GuppyTypeInferenceError:
+        pass
+
+    # Restore the state of these values from before they were potentially
+    # modified by `synthesize_call`.
+    inputs = inputs_copy
+    node = node_copy
 
     # If synthesis fails, we try again, this time also using information from the
     # expected return type
