@@ -1,0 +1,15 @@
+Error: Copy violation (at $FILE:30:40)
+   | 
+28 |     # This violates linearity: the same qubit cannot be both borrowed
+29 |     # and consumed simultaneously
+30 |     q1, q2 = mixed_ownership(qubits[0], qubits[0])
+   |                                         ^^^^^^^^^ Subscript `qubits[...]` with non-copyable type `qubit`
+   |                                                   cannot be consumed ...
+
+Note:
+   | 
+29 |     # and consumed simultaneously
+30 |     q1, q2 = mixed_ownership(qubits[0], qubits[0])
+   |                              --------- Subscript `qubits[...]` already borrowed here
+
+Guppy compilation failed due to 1 previous error
