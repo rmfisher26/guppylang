@@ -2,9 +2,6 @@ from guppylang.decorator import guppy
 from guppylang.std.builtins import array, owned
 from guppylang.std.quantum import qubit, h
 
-import guppylang
-guppylang.enable_experimental_features()
-
 
 @guppy
 def mixed_ownership(q1: qubit, q2: qubit @owned) -> tuple[qubit, qubit]:
