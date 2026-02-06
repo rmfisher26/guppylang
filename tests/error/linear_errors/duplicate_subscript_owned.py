@@ -16,11 +16,8 @@ def mixed_ownership(q1: qubit, q2: qubit @owned) -> tuple[qubit, qubit]:
 def foo() -> None:
     qubits = array((qubit() for _ in range(3)))
 
-    # ERROR: Cannot use qubits[0] twice with different ownership modes
-    # - First argument borrows qubits[0] (will be returned)
-    # - Second argument consumes qubits[0] (takes ownership)
-    # This violates linearity: the same qubit cannot be both borrowed
-    # and consumed simultaneously
+    # Compile time error: The same qubit cannot be used with different
+    # ownership modes simultaneously due to required linearity.
     q1, q2 = mixed_ownership(qubits[0], qubits[0])
 
 
