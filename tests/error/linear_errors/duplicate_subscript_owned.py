@@ -8,14 +8,8 @@ guppylang.enable_experimental_features()
 
 @guppy
 def mixed_ownership(q1: qubit, q2: qubit @owned) -> tuple[qubit, qubit]:
-    """Function with mixed ownership: first parameter is borrowed (inout),
-    second parameter is owned (consumed).
-
-    This demonstrates that the same qubit cannot be used with different
-    ownership modes in a single function call.
-    """
-    q1 = h(q1)  # Transform the borrowed qubit
-    return q1, q2  # Return both qubits
+    q1 = h(q1)
+    return q1, q2
 
 
 @guppy
