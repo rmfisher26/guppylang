@@ -4,30 +4,35 @@ from guppylang.decorator import guppy
 from guppylang.std.array import array, array_swap
 
 
-def test_basic_swap_compiles(validate):
-    """Verify basic swap compiles without errors."""
+def test_basic_swap(validate, run_int_fn):
+    """Verify basic swap compiles and produces the correct result."""
 
     @guppy
-    def swap_first_last() -> None:
+    def swap_first_last() -> array[int, 5]:
         arr = array(1, 2, 3, 4, 5)
         array_swap(arr, 0, 4)
-
-    hugr = swap_first_last.compile()
-    validate(hugr)
-
-
-def test_multiple_swaps(validate):
-    """Test multiple swaps in sequence compile correctly."""
+        return arr
 
     @guppy
-    def multiple() -> None:
-        arr = array(1, 2, 3, 4, 5)
-        array_swap(arr, 0, 4)
-        array_swap(arr, 1, 3)
-        array_swap(arr, 0, 1)
+    def main() -> int:
+        arr = swap_first_last()
+        return arr[0]
 
-    hugr = multiple.compile()
-    validate(hugr)
+    validate(swap_first_last.compile())
+    run_int_fn(main, 5)
+
+
+def test_multiple_swaps(run_int_fn):
+    """Test multiple swaps in sequence produce the correct result."""
+
+    @guppy
+    def main() -> int:
+        arr = array(1, 2, 3, 4, 5)
+        array_swap(arr, 0, 4)  # [5, 2, 3, 4, 1]
+        array_swap(arr, 1, 3)  # [5, 4, 3, 2, 1]
+        return arr[1]
+
+    run_int_fn(main, 4)
 
 
 def test_uses_hugr_swap_op(validate):
