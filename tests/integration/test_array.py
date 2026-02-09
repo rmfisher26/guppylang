@@ -688,6 +688,10 @@ def test_take_put(validate):
 
 
 def test_nested_subscript_different_inner_indices(validate):
+    """Smoketest for checking duplicate subscript accesses:
+    Asserts that nested subscript accesses with duplicate outer subscripts
+    are still allowed."""
+
     @guppy
     def main(
         qs: array[array[qubit, 2], 2] @ owned,
@@ -699,6 +703,10 @@ def test_nested_subscript_different_inner_indices(validate):
 
 
 def test_field_access_after_subscript(validate):
+    """Smoketest for checking duplicate subscript accesses:
+    Asserts that field accesses with duplicate subscripts
+    are still allowed."""
+
     @guppy.struct
     class QubitPair:
         q1: qubit
@@ -713,9 +721,25 @@ def test_field_access_after_subscript(validate):
 
 
 def test_dynamic_index_subscript(validate):
+    """Smoketest for checking duplicate subscript accesses:
+    Asserts that dynamic accesses with duplicate subscripts
+    are still allowed."""
+
     @guppy
     def main(qs: array[qubit, 10] @ owned, i: int, j: int) -> array[qubit, 10]:
         cx(qs[i], qs[j])
+        return qs
+
+    validate(main.compile_function())
+
+
+def test_mixed_static_dynamic_index_subscript(validate):
+    """Smoketest for checking duplicate subscript accesses:
+    Asserts that mixing a static and a dynamic index is still allowed."""
+
+    @guppy
+    def main(qs: array[qubit, 10] @ owned, i: int) -> array[qubit, 10]:
+        cx(qs[0], qs[i])
         return qs
 
     validate(main.compile_function())
