@@ -1,4 +1,7 @@
+import pytest
+
 from guppylang.decorator import guppy
+from guppylang.emulator import EmulatorError
 from guppylang.std.angles import angle, pi
 from guppylang.std.builtins import nat
 from tests.util import compile_guppy
@@ -270,13 +273,13 @@ def test_angle_exec(run_float_fn_approx):
 def test_xor(run_int_fn):
     @guppy
     def main1() -> int:
-        return int(True ^ False ^ False)
+        return int(True ^ False ^ False)  # noqa: RUF046
 
     run_int_fn(main1, 1)
 
     @guppy
     def main2() -> int:
-        return int(True ^ False ^ False ^ True)
+        return int(True ^ False ^ False ^ True)  # noqa: RUF046
 
     run_int_fn(main2, 0)
 
@@ -295,6 +298,32 @@ def test_float_to_int(run_int_fn) -> None:
         return int(-2.75)
 
     run_int_fn(main, -2)
+
+
+def test_nat_to_int(run_int_fn) -> None:
+    @guppy
+    def main() -> int:
+        return int(nat(2))
+
+    run_int_fn(main, 2)
+
+
+def test_int_to_nat(run_int_fn) -> None:
+    @guppy
+    def main() -> nat:
+        return nat(2)
+
+    run_int_fn(main, 2)
+
+
+# TODO this should be a compile-time error
+def test_int_to_nat_negative(run_int_fn) -> None:
+    @guppy
+    def main() -> nat:
+        return nat(-2)
+
+    with pytest.raises(EmulatorError, match="is_to_u called on negative value"):
+        run_int_fn(main, None)
 
 
 def test_float_to_nat(run_int_fn) -> None:

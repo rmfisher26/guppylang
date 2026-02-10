@@ -1,7 +1,6 @@
-import pytest
-
 from hugr import ops
 
+from guppylang import comptime
 from guppylang.decorator import guppy
 from guppylang.std.builtins import array, owned
 from guppylang.std.mem import mem_swap
@@ -12,20 +11,13 @@ from tests.util import compile_guppy
 from guppylang.std.quantum import qubit, discard, measure, h, discard_array
 
 
-@pytest.mark.skip("Requires `is_to_u` in llvm")
 def test_len_execute(validate, run_int_fn):
     @guppy
     def main(xs: array[float, 42]) -> int:
         return len(xs)
 
-    compiled = main.compile_function()
-    validate(compiled)
-    if run_int_fn is not None:
-        run_int_fn(compiled, expected=42)
-
-
-def test_len(validate):
-    test_len_execute(validate, None)
+    validate(main.compile_function())
+    run_int_fn(main, expected=42, args=[array(float(i) for i in range(42))])
 
 
 def test_len_linear(validate):
@@ -570,7 +562,7 @@ def test_subscript_assign_unpacking_complicated(run_int_fn):
     @guppy
     def main() -> int:
         xs = array(0, 0, 0)
-        (a1, a2), *b, (c1, c2) = array((0, 1), (2, 3), (4, 5), (5, 6))
+        (a1, _a2), *_b, (c1, _c2) = array((0, 1), (2, 3), (4, 5), (5, 6))
         return a1 + c1
 
     run_int_fn(main, expected=5)
@@ -580,7 +572,7 @@ def test_subscript_assign_unpacking_range(run_int_fn):
     @guppy
     def main() -> int:
         xs = array(0, 0, 0)
-        a, *b, xs[1] = range(10)
+        _a, *_b, xs[1] = range(10)
         return xs[1]
 
     run_int_fn(main, expected=9)
@@ -590,7 +582,7 @@ def test_subscript_assign_unpacking_array(run_int_fn):
     @guppy
     def main() -> int:
         xs = array(0, 0, 0)
-        a, *b, xs[1] = array(1, 2, 3, 4)
+        _a, *_b, xs[1] = array(1, 2, 3, 4)
         return xs[1]
 
     run_int_fn(main, expected=4)
@@ -691,3 +683,13 @@ def test_take_put(validate):
     ]
 
     validate(main.compile())
+
+
+# https://github.com/CQCL/hugr/issues/1826
+def test_array_const(validate, run_int_fn):
+    @guppy
+    def main() -> int:
+        bs = comptime([True, False])
+        return int(bs[0])
+
+    run_int_fn(main, expected=1)
