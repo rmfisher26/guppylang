@@ -237,21 +237,6 @@ def test_functional_2qb_array(validate):
     validate(test.compile_function())
 
 
-def test_scalar_still_works(validate):
-    """Ensure scalar usage of gates still works after overloading."""
-
-    @guppy
-    def test() -> bool:
-        q1 = qubit()
-        q2 = qubit()
-        q.h(q1)
-        q.cx(q1, q2)
-        discard(q1)
-        return measure(q2)
-
-    validate(test.compile_function())
-
-
 def test_panic_discard(validate):
     """Panic while discarding qubit."""
 

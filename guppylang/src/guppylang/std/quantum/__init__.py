@@ -569,6 +569,7 @@ def reset(q) -> None:
 # Backward-compatible aliases
 measure_array = _measure_array
 discard_array = _discard_array
+reset_array = _reset_array
 
 
 # -------NON-PRIMITIVE-------
