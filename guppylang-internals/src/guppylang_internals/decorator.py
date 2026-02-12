@@ -214,7 +214,7 @@ def wasm_module(
     filename: str,
 ) -> Callable[[builtins.type[T]], GuppyDefinition]:
     # Resolve the path relative to the caller's source file directory,
-    # not the current working directory (fixes #1407).
+    # not the current working directory.
     caller_file = None
     frame = inspect.currentframe()
     while frame:
