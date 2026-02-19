@@ -62,6 +62,7 @@ from guppylang_internals.checker.errors.comptime_errors import (
     ComptimeExprIncoherentListError,
     ComptimeExprNotCPythonError,
     ComptimeExprNotStaticError,
+    ComptimeGuppyObjectError,
     ComptimeUnknownError,
     IllegalComptimeExpressionError,
 )
@@ -90,6 +91,7 @@ from guppylang_internals.definition.parameter import ParamDef
 from guppylang_internals.definition.ty import TypeDef
 from guppylang_internals.definition.value import CallableDef, ValueDef
 from guppylang_internals.error import (
+    GuppyComptimeError,
     GuppyError,
     GuppyTypeError,
     GuppyTypeInferenceError,
@@ -1364,10 +1366,18 @@ def eval_comptime_expr(node: ComptimeExpr, ctx: Context) -> Any:
     if sys.implementation.name != "cpython":
         raise GuppyError(ComptimeExprNotCPythonError(node))
 
+    # Save sys.excepthook since `@hide_trace`-decorated Guppy callables (e.g. types
+    # and functions) may override it with `tracing_except_hook` if they raise a
+    # GuppyComptimeError during eval. We need to restore it so that the GuppyError
+    # we raise below is handled by the correct (pretty-printing) hook.
+    saved_excepthook = sys.excepthook
     try:
         python_val = eval(ast.unparse(node.value), DummyEvalDict(ctx, node.value))  # noqa: S307
     except DummyEvalDict.GuppyVarUsedError as e:
         raise GuppyError(ComptimeExprNotStaticError(e.node or node, e.var)) from None
+    except GuppyComptimeError as e:
+        sys.excepthook = saved_excepthook
+        raise GuppyError(ComptimeGuppyObjectError(node.value, str(e))) from e
     except Exception as e:
         # Remove the top frame pointing to the `eval` call from the stack trace
         tb = e.__traceback__.tb_next if e.__traceback__ else None
