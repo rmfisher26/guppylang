@@ -40,6 +40,7 @@ from guppylang_internals.tys.builtin import (
 from guppylang_internals.tys.param import Parameter
 from guppylang_internals.tys.ty import (
     BoundTypeVar,
+    EnumType,
     ExistentialTypeVar,
     FunctionType,
     InputFlags,
@@ -376,6 +377,8 @@ class Globals:
             case OpaqueType() as ty:
                 type_defn = ty.defn
             case StructType() as ty:
+                type_defn = ty.defn
+            case EnumType() as ty:
                 type_defn = ty.defn
             case TupleType():
                 type_defn = tuple_type_def

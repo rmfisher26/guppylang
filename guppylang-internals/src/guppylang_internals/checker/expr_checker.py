@@ -502,6 +502,19 @@ class ExprSynthesizer(AstVisitor[tuple[ast.expr, Type]]):
             raise GuppyError(
                 ModuleMemberNotFoundError(attr_span, module.__name__, node.attr)
             )
+        # Handle type-level static constructor access: MyEnum.VariantA(...)
+        # This must be checked before synthesizing node.value, since a bare TypeDef
+        # in expression position (without __new__) would fail synthesis.
+        if isinstance(node.value, ast.Name) and node.value.id in self.ctx.globals:
+            base = self.ctx.globals[node.value.id]
+            if isinstance(base, TypeDef) and (
+                constr := self.ctx.globals.get_instance_func(base, node.attr)
+            ):
+                qual_name = f"{node.value.id}.{node.attr}"
+                return (
+                    with_loc(node, GlobalName(id=qual_name, def_id=constr.id)),
+                    constr.ty,
+                )
         node.value, ty = self.synthesize(node.value)
         if isinstance(ty, StructType) and node.attr in ty.field_dict:
             field = ty.field_dict[node.attr]

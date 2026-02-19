@@ -22,6 +22,7 @@ from guppylang_internals.definition.custom import (
     RawCustomFunctionDef,
 )
 from guppylang_internals.definition.declaration import RawFunctionDecl
+from guppylang_internals.definition.enum import RawEnumDef
 from guppylang_internals.definition.extern import RawExternDef
 from guppylang_internals.definition.function import (
     RawFunctionDef,
@@ -216,6 +217,33 @@ class _Guppy:
             cls.__firstlineno__ = frame.f_lineno  # type: ignore[attr-defined]
         # We're pretending to return the class unchanged, but in fact we return
         # a `GuppyDefinition` that handles the comptime logic
+        return GuppyDefinition(defn)  # type: ignore[return-value]
+
+    @dataclass_transform()
+    def enum(self, cls: builtins.type[T]) -> builtins.type[T]:
+        """Registers a class as a Guppy enum (sum/tagged-union type).
+
+        Each variant is declared as a class-level assignment whose value is a
+        ``dict`` mapping field names to their Guppy type annotations::
+
+            T = guppy.type_var("T")
+
+            @guppy.enum
+            class Result(Generic[T]):
+                Ok  = {"value": T}
+                Err = {"code": int}
+                Nil = {}
+
+            @guppy
+            def make_ok(x: int) -> Result[int]:
+                return Result.Ok(x)
+        """
+        defn = RawEnumDef(DefId.fresh(), cls.__name__, None, cls)
+        frame = get_calling_frame()
+        DEF_STORE.register_def(defn, frame)
+        # Prior to Python 3.13, `__firstlineno__` is not set on classes.
+        if not hasattr(cls, "__firstlineno__"):
+            cls.__firstlineno__ = frame.f_lineno  # type: ignore[attr-defined]
         return GuppyDefinition(defn)  # type: ignore[return-value]
 
     def type_var(

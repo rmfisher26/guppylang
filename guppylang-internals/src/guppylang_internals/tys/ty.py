@@ -24,6 +24,7 @@ from guppylang_internals.tys.param import ConstParam, Parameter
 from guppylang_internals.tys.var import BoundVar, ExistentialVar
 
 if TYPE_CHECKING:
+    from guppylang_internals.definition.enum import CheckedEnumDef, EnumVariant
     from guppylang_internals.definition.struct import CheckedStructDef, StructField
     from guppylang_internals.definition.ty import OpaqueTypeDef
     from guppylang_internals.tys.subst import Inst, PartialInst, Subst
@@ -723,8 +724,57 @@ class StructType(ParametrizedTypeBase):
         )
 
 
+@dataclass(frozen=True)
+class EnumType(ParametrizedTypeBase):
+    """An enum (sum) type."""
+
+    defn: "CheckedEnumDef"
+
+    @cached_property
+    def variants(self) -> "list[EnumVariant]":
+        """The variants of this enum type with instantiated generic parameters."""
+        from guppylang_internals.definition.enum import EnumVariant
+        from guppylang_internals.definition.struct import StructField
+        from guppylang_internals.tys.subst import Instantiator
+
+        inst = Instantiator(self.args)
+        return [
+            EnumVariant(
+                v.name,
+                [StructField(f.name, f.ty.transform(inst)) for f in v.fields],
+            )
+            for v in self.defn.variants
+        ]
+
+    @property
+    def intrinsically_copyable(self) -> bool:
+        """Whether objects of this type can be implicitly copied."""
+        return all(f.ty.copyable for v in self.variants for f in v.fields)
+
+    @property
+    def intrinsically_droppable(self) -> bool:
+        """Whether objects of this type can be dropped."""
+        return all(f.ty.droppable for v in self.variants for f in v.fields)
+
+    def cast(self) -> "Type":
+        """Casts an implementor of `TypeBase` into a `Type`."""
+        return self
+
+    def to_hugr(self, ctx: "ToHugrContext") -> ht.Sum:
+        """Computes the Hugr representation of the type."""
+        return ht.Sum([[f.ty.to_hugr(ctx) for f in v.fields] for v in self.variants])
+
+    def transform(self, transformer: "Transformer") -> "Type":
+        """Accepts a transformer on this type."""
+        return transformer.transform(self) or EnumType(
+            [arg.transform(transformer) for arg in self.args], self.defn
+        )
+
+
 #: The type of parametrized Guppy types.
-ParametrizedType: TypeAlias = FunctionType | TupleType | OpaqueType | StructType
+ParametrizedType: TypeAlias = (
+    FunctionType | TupleType | OpaqueType | StructType | EnumType
+)
 
 
 #: The type of Guppy types.
@@ -810,6 +860,8 @@ def unify(s: Type | Const, t: Type | Const, subst: "Subst | None") -> "Subst | N
         case OpaqueType() as s, OpaqueType() as t if s.defn == t.defn:
             return _unify_args(s, t, subst)
         case StructType() as s, StructType() as t if s.defn == t.defn:
+            return _unify_args(s, t, subst)
+        case EnumType() as s, EnumType() as t if s.defn == t.defn:
             return _unify_args(s, t, subst)
         case _:
             return None
