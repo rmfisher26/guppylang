@@ -51,9 +51,8 @@ class ComptimeGuppyObjectError(Error):
     span_label: ClassVar[str] = "Cannot use a Guppy object in a comptime expression"
     message: ClassVar[str] = (
         "{err_message}\n\n"
-        "Valid comptime expressions must evaluate to a plain Python value. "
-        "Supported types are: `bool`, `str`, `int`, `float`, `tuple`, `list`, "
-        "and `None`."
+        "Comptime expressions are evaluated as plain Python. Guppy functions "
+        "and types require a Guppy context and cannot be called inside `comptime`."
     )
     err_message: str
 
