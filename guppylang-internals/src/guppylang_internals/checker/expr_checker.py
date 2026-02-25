@@ -96,6 +96,7 @@ from guppylang_internals.error import (
     GuppyTypeError,
     GuppyTypeInferenceError,
     InternalGuppyError,
+    saved_exception_hook,
 )
 from guppylang_internals.experimental import (
     check_function_tensors_enabled,
@@ -1366,23 +1367,26 @@ def eval_comptime_expr(node: ComptimeExpr, ctx: Context) -> Any:
     if sys.implementation.name != "cpython":
         raise GuppyError(ComptimeExprNotCPythonError(node))
 
-    # Save sys.excepthook since `@hide_trace`-decorated Guppy callables (e.g. types
-    # and functions) may override it with `tracing_except_hook` if they raise a
-    # GuppyComptimeError during eval. We need to restore it so that the GuppyError
-    # we raise below is handled by the correct (pretty-printing) hook.
-    saved_excepthook = sys.excepthook
-    try:
-        python_val = eval(ast.unparse(node.value), DummyEvalDict(ctx, node.value))  # noqa: S307
-    except DummyEvalDict.GuppyVarUsedError as e:
-        raise GuppyError(ComptimeExprNotStaticError(e.node or node, e.var)) from None
-    except GuppyComptimeError as e:
-        sys.excepthook = saved_excepthook
-        raise GuppyError(ComptimeGuppyObjectError(node.value, str(e))) from e
-    except Exception as e:
-        # Remove the top frame pointing to the `eval` call from the stack trace
-        tb = e.__traceback__.tb_next if e.__traceback__ else None
-        tb_formatted = "".join(traceback.format_exception(type(e), e, tb))
-        raise GuppyError(ComptimeExprEvalError(node.value, tb_formatted)) from e
+    # Wrap the eval in saved_exception_hook so that any changes to sys.excepthook made
+    # by `@hide_trace`-decorated Guppy callables (e.g. types and functions) are rolled
+    # back when the block exits. Without this, a GuppyComptimeError propagating through
+    # @hide_trace would leave `tracing_except_hook` as sys.excepthook, causing the
+    # GuppyError raised below to render as a raw Python traceback instead of a formatted
+    # Guppy error.
+    with saved_exception_hook():
+        try:
+            python_val = eval(ast.unparse(node.value), DummyEvalDict(ctx, node.value))  # noqa: S307
+        except DummyEvalDict.GuppyVarUsedError as e:
+            raise GuppyError(
+                ComptimeExprNotStaticError(e.node or node, e.var)
+            ) from None
+        except GuppyComptimeError as e:
+            raise GuppyError(ComptimeGuppyObjectError(node.value, str(e))) from e
+        except Exception as e:
+            # Remove the top frame pointing to the `eval` call from the stack trace
+            tb = e.__traceback__.tb_next if e.__traceback__ else None
+            tb_formatted = "".join(traceback.format_exception(type(e), e, tb))
+            raise GuppyError(ComptimeExprEvalError(node.value, tb_formatted)) from e
     return python_val
 
 
