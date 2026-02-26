@@ -1367,12 +1367,10 @@ def eval_comptime_expr(node: ComptimeExpr, ctx: Context) -> Any:
     if sys.implementation.name != "cpython":
         raise GuppyError(ComptimeExprNotCPythonError(node))
 
-    # Wrap the eval in saved_exception_hook so that any changes to sys.excepthook made
-    # by `@hide_trace`-decorated Guppy callables (e.g. types and functions) are rolled
-    # back when the block exits. Without this, a GuppyComptimeError propagating through
-    # @hide_trace would leave `tracing_except_hook` as sys.excepthook, causing the
-    # GuppyError raised below to render as a raw Python traceback instead of a formatted
-    # Guppy error.
+    # Ensure that any modifications to sys.excepthook performed in the `eval` call (e.g. through 
+    # `@hide_trace`-decorated Guppy callables) are rolled back to the current exception hook
+    # when `eval` exits. Without this, exceptions raised during `eval` may cause the sys.excepthook
+    # to render raw tracebacks instead of formatted diagnostics.
     with saved_exception_hook():
         try:
             python_val = eval(ast.unparse(node.value), DummyEvalDict(ctx, node.value))  # noqa: S307
