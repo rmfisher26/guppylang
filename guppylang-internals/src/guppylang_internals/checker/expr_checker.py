@@ -1367,24 +1367,23 @@ def eval_comptime_expr(node: ComptimeExpr, ctx: Context) -> Any:
     if sys.implementation.name != "cpython":
         raise GuppyError(ComptimeExprNotCPythonError(node))
 
-    # Ensure that any modifications to sys.excepthook performed in the `eval` call (e.g. through 
-    # `@hide_trace`-decorated Guppy callables) are rolled back to the current exception hook
-    # when `eval` exits. Without this, exceptions raised during `eval` may cause the sys.excepthook
-    # to render raw tracebacks instead of formatted diagnostics.
-    with saved_exception_hook():
-        try:
+    # Ensure that any modifications to sys.excepthook performed in the `eval` call
+    # (e.g. through `@hide_trace`-decorated Guppy callables) are rolled back to the
+    # current exception hook when `eval` exits. Without this, exceptions raised
+    # during `eval` may cause the sys.excepthook to render raw tracebacks instead
+    # of formatted diagnostics.
+    try:
+        with saved_exception_hook():
             python_val = eval(ast.unparse(node.value), DummyEvalDict(ctx, node.value))  # noqa: S307
-        except DummyEvalDict.GuppyVarUsedError as e:
-            raise GuppyError(
-                ComptimeExprNotStaticError(e.node or node, e.var)
-            ) from None
-        except GuppyComptimeError as e:
-            raise GuppyError(ComptimeGuppyObjectError(node.value, str(e))) from e
-        except Exception as e:
-            # Remove the top frame pointing to the `eval` call from the stack trace
-            tb = e.__traceback__.tb_next if e.__traceback__ else None
-            tb_formatted = "".join(traceback.format_exception(type(e), e, tb))
-            raise GuppyError(ComptimeExprEvalError(node.value, tb_formatted)) from e
+    except DummyEvalDict.GuppyVarUsedError as e:
+        raise GuppyError(ComptimeExprNotStaticError(e.node or node, e.var)) from None
+    except GuppyComptimeError as e:
+        raise GuppyError(ComptimeGuppyObjectError(node.value, str(e))) from e
+    except Exception as e:
+        # Remove the top frame pointing to the `eval` call from the stack trace
+        tb = e.__traceback__.tb_next if e.__traceback__ else None
+        tb_formatted = "".join(traceback.format_exception(type(e), e, tb))
+        raise GuppyError(ComptimeExprEvalError(node.value, tb_formatted)) from e
     return python_val
 
 
