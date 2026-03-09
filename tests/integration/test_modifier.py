@@ -132,7 +132,7 @@ def test_free_copyable_variable_in_modifier(validate):
     validate(bar.compile_function())
 
 
-def test_nested_dagger_power_valid(validate):
+def test_nested_dagger_power(validate):
     """Nested dagger+power: function supporting both flags is valid."""
 
     @guppy(dagger=True, power=True)
@@ -148,7 +148,7 @@ def test_nested_dagger_power_valid(validate):
     validate(bar.compile_function())
 
 
-def test_nested_control_dagger_valid(validate):
+def test_nested_control_dagger(validate):
     """Nested control+dagger: function supporting both flags is valid."""
 
     @guppy(control=True, dagger=True)
@@ -164,7 +164,7 @@ def test_nested_control_dagger_valid(validate):
     validate(bar.compile_function())
 
 
-def test_nested_power_control_valid(validate):
+def test_nested_power_control(validate):
     """Nested power+control: function supporting both flags is valid."""
 
     @guppy(power=True, control=True)
@@ -180,7 +180,7 @@ def test_nested_power_control_valid(validate):
     validate(bar.compile_function())
 
 
-def test_nested_triple_all_flags_valid(validate):
+def test_nested_triple_all_flags(validate):
     """Triple nesting with a function supporting all unitary flags is valid."""
 
     @guppy(dagger=True, control=True, power=True)
@@ -197,7 +197,7 @@ def test_nested_triple_all_flags_valid(validate):
     validate(bar.compile_function())
 
 
-def test_nested_same_modifier_valid(validate):
+def test_nested_same_modifier(validate):
     """Double-nesting the same modifier (dagger) with a dagger-supporting function."""
 
     @guppy(dagger=True)
