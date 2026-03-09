@@ -211,3 +211,33 @@ def test_nested_same_modifier(validate):
                 foo(q)
 
     validate(bar.compile_function())
+
+
+def test_double_dagger_cancellation(validate):
+    """Two daggers in a single with-block cancel out: foo needs no dagger support."""
+
+    @guppy.declare
+    def foo(q: qubit) -> None: ...
+
+    @guppy
+    def bar(q: qubit) -> None:
+        with dagger, dagger:
+            foo(q)
+
+    validate(bar.compile_function())
+
+
+def test_combined_with_items_nested(validate):
+    """Multiple modifiers in one with-block are all propagated into a nested block."""
+
+    @guppy(dagger=True, control=True, power=True)
+    def foo(q: qubit) -> None:
+        pass
+
+    @guppy
+    def bar(ctrl: qubit, q: qubit) -> None:
+        with control(ctrl), dagger:
+            with power(2):
+                foo(q)
+
+    validate(bar.compile_function())

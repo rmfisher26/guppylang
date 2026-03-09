@@ -42,6 +42,7 @@ from guppylang_internals.nodes import (
     MakeIter,
     ModifiedBlock,
     Modifier,
+    Modifiers,
     NestedFunctionDef,
     Power,
 )
@@ -327,44 +328,22 @@ class CFGBuilder(AstVisitor[BB | None]):
         check_modifiers_enabled(node)
         self._validate_modified_block(node)
 
-        # Pre-compute this block's modifier flags and combine them with any flags
-        # already accumulated from enclosing `with` blocks (stored in
-        # `self.cfg.unitary_flags`).  Passing the combined value into `build()` lets
-        # every inner CFG see the full modifier context it is compiled under, which is
-        # necessary for correct unitary checking of deeply nested `with` blocks.
-        accumulated_flags = self.cfg.unitary_flags | self._peek_flags(node.items)
-        cfg = CFGBuilder().build(node.body, True, self.globals, accumulated_flags)
-        new_node = ModifiedBlock(
-            cfg=cfg,
-            **dict(ast.iter_fields(node)),
-        )
-
+        # Build context expressions and extract modifiers before constructing the inner
+        # CFG so we can derive the accumulated flags directly from the Modifier objects.
+        modifiers = Modifiers()
         for item in node.items:
             item.context_expr, bb = ExprBuilder.build(item.context_expr, self.cfg, bb)
-            modifier = self._handle_withitem(item)
-            new_node.push_modifier(modifier)
+            modifiers.push(self._handle_withitem(item))
+
+        accumulated_flags = self.cfg.unitary_flags | modifiers.flags()
+        cfg = CFGBuilder().build(node.body, True, self.globals, accumulated_flags)
+        new_node = ModifiedBlock(
+            cfg=cfg, modifiers=modifiers, **dict(ast.iter_fields(node))
+        )
 
         set_location_from(new_node, node)
         bb.statements.append(new_node)
         return bb
-
-    def _peek_flags(self, items: list[ast.withitem]) -> UnitaryFlags:
-        """Pre-computes which modifier flags are introduced by the given with-items.
-
-        This inspects the syntactic form of each context expression without doing full
-        expression building, matching the same patterns as `_handle_withitem`.
-        """
-        flags = UnitaryFlags.NoFlags
-        for item in items:
-            e = item.context_expr
-            match e:
-                case ast.Name(id="dagger") | ast.Call(func=ast.Name(id="dagger")):
-                    flags |= UnitaryFlags.Dagger
-                case ast.Call(func=ast.Name(id="control")):
-                    flags |= UnitaryFlags.Control
-                case ast.Call(func=ast.Name(id="power")):
-                    flags |= UnitaryFlags.Power
-        return flags
 
     def _handle_withitem(self, node: ast.withitem) -> Modifier:
         # Check that `as` notation is not used

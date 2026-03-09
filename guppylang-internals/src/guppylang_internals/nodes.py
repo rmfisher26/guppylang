@@ -1,7 +1,7 @@
 """Custom AST nodes used by Guppy"""
 
 import ast
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
@@ -740,18 +740,59 @@ class Power(ast.expr):
 Modifier = Dagger | Control | Power
 
 
+class Modifiers:
+    """Collects modifiers from a `with` block and derives their UnitaryFlags."""
+
+    dagger: list[Dagger]
+    control: list[Control]
+    power: list[Power]
+    _all: list[Modifier]
+
+    def __init__(self) -> None:
+        self.dagger = []
+        self.control = []
+        self.power = []
+        self._all = []
+
+    def push(self, modifier: Modifier) -> None:
+        self._all.append(modifier)
+        if isinstance(modifier, Dagger):
+            self.dagger.append(modifier)
+        elif isinstance(modifier, Control):
+            self.control.append(modifier)
+        else:
+            assert isinstance(modifier, Power)
+            self.power.append(modifier)
+
+    def flags(self) -> UnitaryFlags:
+        result = UnitaryFlags.NoFlags
+        if len(self.dagger) % 2 == 1:
+            result |= UnitaryFlags.Dagger
+        if self.control:
+            result |= UnitaryFlags.Control
+        if self.power:
+            result |= UnitaryFlags.Power
+        return result
+
+    def __iter__(self) -> Iterator[Modifier]:
+        return iter(self._all)
+
+
 class ModifiedBlock(ast.With):
     cfg: "CFG"
     dagger: list[Dagger]
     control: list[Control]
     power: list[Power]
 
-    def __init__(self, cfg: "CFG", *args: Any, **kwargs: Any) -> None:
+    def __init__(
+        self, cfg: "CFG", modifiers: "Modifiers", *args: Any, **kwargs: Any
+    ) -> None:
         super().__init__(*args, **kwargs)
         self.cfg = cfg
-        self.dagger = []
-        self.control = []
-        self.power = []
+        self.modifiers = modifiers
+        self.dagger = modifiers.dagger
+        self.control = modifiers.control
+        self.power = modifiers.power
 
     # See MakeIter for explanation
     __reduce__ = object.__reduce__
@@ -771,17 +812,6 @@ class ModifiedBlock(ast.With):
             to_span(self.items[0].context_expr).start,
             to_span(self.items[-1].context_expr).end,
         )
-
-    def push_modifier(self, modifier: Modifier) -> None:
-        """Pushes a modifier kind onto the modifier."""
-        if isinstance(modifier, Dagger):
-            self.dagger.append(modifier)
-        elif isinstance(modifier, Control):
-            self.control.append(modifier)
-        elif isinstance(modifier, Power):
-            self.power.append(modifier)
-        else:
-            raise TypeError(f"Unknown modifier: {modifier}")
 
     def flags(self) -> UnitaryFlags:
         flags = UnitaryFlags.NoFlags
@@ -812,9 +842,7 @@ class CheckedModifiedBlock(ast.With):
         cfg: "CheckedCFG[Place]",
         ty: FunctionType,
         captured: Mapping[str, tuple["Variable", AstNode]],
-        dagger: list[Dagger],
-        control: list[Control],
-        power: list[Power],
+        modifiers: Modifiers,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -823,9 +851,10 @@ class CheckedModifiedBlock(ast.With):
         self.cfg = cfg
         self.ty = ty
         self.captured = captured
-        self.dagger = dagger
-        self.control = control
-        self.power = power
+        self.modifiers = modifiers
+        self.dagger = modifiers.dagger
+        self.control = modifiers.control
+        self.power = modifiers.power
 
     # See MakeIter for explanation
     __reduce__ = object.__reduce__
