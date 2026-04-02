@@ -26,7 +26,7 @@ from guppylang_internals.definition.common import (
 )
 from guppylang_internals.engine import BUILTIN_DEFS, DEF_STORE, ENGINE
 from guppylang_internals.error import InternalGuppyError
-from guppylang_internals.tys.param import Parameter
+from guppylang_internals.tys.arg import Argument
 from guppylang_internals.tys.ty import (
     InputFlags,
     StructType,
@@ -312,14 +312,9 @@ class Globals:
 
     def __init__(self, frame: FrameType) -> None:
         self.frame = frame
-        if frame is not None:
-            self.f_locals = frame.f_locals
-            self.f_globals = frame.f_globals
-            self.f_builtins = frame.f_builtins
-        else:
-            self.f_locals = {}
-            self.f_globals = {}
-            self.f_builtins = {}
+        self.f_locals = frame.f_locals
+        self.f_globals = frame.f_globals
+        self.f_builtins = frame.f_builtins
 
     @staticmethod
     @cache
@@ -450,14 +445,14 @@ class Context(NamedTuple):
 
     globals: Globals
     locals: Locals[str, Variable]
-    generic_params: dict[str, Parameter]
+    generic_param_inst: dict[str, Argument]
 
     @property
     def parsing_ctx(self) -> "TypeParsingCtx":
         """A type parsing context derived from this checking context."""
         from guppylang_internals.tys.parsing import TypeParsingCtx
 
-        return TypeParsingCtx(self.globals, self.generic_params)
+        return TypeParsingCtx(self.globals, param_inst=self.generic_param_inst)
 
 
 class DummyEvalDict(dict[str, Any]):
