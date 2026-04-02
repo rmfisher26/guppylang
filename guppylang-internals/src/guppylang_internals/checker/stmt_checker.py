@@ -279,7 +279,13 @@ class StmtChecker(AstVisitor[BBStatement]):
                 unsolved = array_type(ExistentialTypeVar.fresh("T", True, True), 0)
                 raise GuppyError(TypeInferenceError(starred, unsolved))
             array_ty = array_type(starred_ty, len(starred_tys))
-            unpack.pattern.starred = self._check_assign(starred, rhs_elts[0], array_ty)
+            assert isinstance(starred, ast.Name), "Python grammar"
+            # We can use any value for `rhs` as it is ignored for variable assignments.
+            unpack.pattern.starred = self._check_variable_assign(
+                starred,
+                rhs_elts[0],  # ignored
+                array_ty,
+            )
 
         return with_type(rhs_ty, with_loc(lhs, unpack))
 
