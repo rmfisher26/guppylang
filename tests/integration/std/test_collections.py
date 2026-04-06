@@ -172,3 +172,30 @@ def test_queue_empty() -> None:
         EmulatorError, match=r"Panic \(#1001\): Queue.pop: queue is empty"
     ):
         main.emulator(n_qubits=0).stabilizer_sim().with_seed(42).run()
+
+
+def test_queue_circular(run_int_fn) -> None:
+    @guppy
+    def main() -> int:
+        # Use a small MAX_SIZE to force wrap-around
+        q: Queue[int, 5] = empty_queue()
+        # Fill half, pop some, then push more to wrap
+        for i in range(3):
+            q = q.push(i)
+        # Pop two elements
+        for _ in range(2):
+            _, q = q.pop()
+        # Push again to cause wrap-around
+        for i in range(3, 5):
+            q = q.push(i)
+        # Drain and sum to verify order
+        total = 0
+        multiplier = 1
+        while len(q) > 0:
+            x, q = q.pop()
+            total += x * multiplier
+            multiplier += 1
+        return total
+
+    # Expected order: remaining elements are [2,3,4]; sum with multipliers 1,2,3
+    run_int_fn(main, 2 * 1 + 3 * 2 + 4 * 3)

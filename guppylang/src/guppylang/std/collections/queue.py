@@ -31,15 +31,18 @@ class Queue(Generic[T, MAX_SIZE]):  # type: ignore[misc]
     #: INVARIANT: All array elements up to and including index `self.end - 1` are
     #: `option.some` variants and all further ones are `option.nothing`.
     buf: array[Option[T], MAX_SIZE]  # type: ignore[valid-type, type-arg]
-
+    #: Index of the current front of the queue (first element to be popped).
+    start: int
     #: Index of the next free index in `self.buf`.
     end: int
+    #: Number of elements currently stored in the queue.
+    size: int
 
     @guppy
     @no_type_check
     def __len__(self: Queue[T, MAX_SIZE]) -> int:
         """Returns the number of elements currently stored in the queue."""
-        return self.end
+        return self.size
 
     @guppy
     @no_type_check
@@ -65,10 +68,11 @@ class Queue(Generic[T, MAX_SIZE]):  # type: ignore[misc]
 
         Panics if the queue has already reached its maximum size.
         """
-        if self.end >= MAX_SIZE:
+        if self.size >= MAX_SIZE:
             panic("Queue.push: max size reached")
         self.buf[self.end].swap(some(elem)).unwrap_nothing()
-        return Queue(self.buf, self.end + 1)
+        new_end = (self.end + 1) % MAX_SIZE
+        return Queue(self.start, self.buf, new_end, self.size + 1)
 
     @guppy
     @no_type_check
@@ -78,13 +82,11 @@ class Queue(Generic[T, MAX_SIZE]):  # type: ignore[misc]
 
         Panics if the queue is empty.
         """
-        if self.end <= 0:
+        if self.size == 0:
             panic("Queue.pop: queue is empty")
-        elem = self.buf[0].take().unwrap()
-        for i in range(self.end - 1):
-            next_elem = self.buf[i + 1].take().unwrap()
-            self.buf[i].swap(some(next_elem)).unwrap_nothing()
-        return elem, Queue(self.buf, self.end - 1)
+        elem = self.buf[self.start].take().unwrap()
+        new_start = (self.start + 1) % MAX_SIZE
+        return elem, Queue(new_start, self.buf, self.end, self.size - 1)
 
     @guppy
     @no_type_check
@@ -97,10 +99,10 @@ class Queue(Generic[T, MAX_SIZE]):  # type: ignore[misc]
 
         Note that this operation is only allowed if the queue elements are copyable.
         """
-        if self.end <= 0:
+        if self.size == 0:
             panic("Queue.peek: queue is empty")
-        elem = self.buf[0].unwrap()
-        return elem, Queue(self.buf, self.end)
+        elem = self.buf[self.start].unwrap()
+        return elem, Queue(self.start, self.buf, self.end, self.size)
 
     @guppy
     @no_type_check
@@ -110,7 +112,7 @@ class Queue(Generic[T, MAX_SIZE]):  # type: ignore[misc]
 
         Panics if the queue is not empty.
         """
-        if self.end > 0:
+        if self.size != 0:
             panic("Queue.discard_empty: queue is not empty")
         for elem in self.buf:
             elem.unwrap_nothing()
@@ -121,4 +123,4 @@ class Queue(Generic[T, MAX_SIZE]):  # type: ignore[misc]
 def empty_queue() -> Queue[T, MAX_SIZE]:
     """Constructs a new empty queue."""
     buf = array(nothing[T]() for _ in range(MAX_SIZE))
-    return Queue(buf, 0)
+    return Queue(0, buf, 0, 0)
