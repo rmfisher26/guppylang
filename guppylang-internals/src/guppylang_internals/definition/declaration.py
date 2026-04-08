@@ -43,6 +43,7 @@ from guppylang_internals.definition.value import (
 from guppylang_internals.diagnostic import Error
 from guppylang_internals.engine import ENGINE
 from guppylang_internals.error import GuppyError
+from guppylang_internals.metadata.common import FunctionMetadata, add_metadata
 from guppylang_internals.nodes import GlobalCall
 from guppylang_internals.span import SourceMap
 from guppylang_internals.tys.param import Parameter
@@ -84,9 +85,12 @@ class RawFunctionDecl(ParsableDef, UserProvidedLinkName):
     """
 
     python_func: PyFunc
+
     description: str = field(default="function", init=False)
 
     unitary_flags: UnitaryFlags = field(default=UnitaryFlags.NoFlags, kw_only=True)
+
+    metadata: FunctionMetadata | None = field(default=None, kw_only=True)
 
     def parse(self, globals: Globals, sources: SourceMap) -> "ParsedFunctionDecl":
         """Parses and checks the user-provided signature of the function."""
@@ -108,6 +112,7 @@ class RawFunctionDecl(ParsableDef, UserProvidedLinkName):
             ty=ty,
             docstring=docstring,
             link_name=link_name,
+            metadata=self.metadata,
         )
 
 
@@ -130,6 +135,7 @@ class ParsedFunctionDecl(CheckableGenericDef, CallableDef):
     defined_at: ast.FunctionDef
     docstring: str | None
     link_name: str
+    metadata: FunctionMetadata | None = field(default=None, kw_only=True)
 
     @property
     def params(self) -> Sequence[Parameter]:
@@ -195,6 +201,11 @@ class CheckedFunctionDecl(ParsedFunctionDecl, CompilableDef):
         module: hf.Module = module
 
         node = module.declare_function(self.link_name, self.ty.to_hugr_poly(ctx))
+        add_metadata(
+            node,
+            self.metadata,
+            additional_metadata={"unitary": self.ty.unitary_flags.value},
+        )
         if debug_mode_enabled():
             node.metadata[HugrDebugInfo] = make_subprogram_record(
                 self.defined_at, ctx, is_decl=True
@@ -208,6 +219,7 @@ class CheckedFunctionDecl(ParsedFunctionDecl, CompilableDef):
             link_name=self.link_name,
             type_args=self.type_args,
             declaration=node,
+            metadata=self.metadata,
         )
 
 

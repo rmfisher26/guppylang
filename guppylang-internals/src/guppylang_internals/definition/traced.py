@@ -36,10 +36,11 @@ from guppylang_internals.definition.value import (
     CompiledHugrNodeDef,
 )
 from guppylang_internals.error import GuppyError
+from guppylang_internals.metadata.common import FunctionMetadata, add_metadata
 from guppylang_internals.nodes import GlobalCall
 from guppylang_internals.span import SourceMap
 from guppylang_internals.tys.subst import Inst, Subst
-from guppylang_internals.tys.ty import FunctionType, Type, type_to_row
+from guppylang_internals.tys.ty import FunctionType, Type, UnitaryFlags, type_to_row
 
 PyFunc = Callable[..., Any]
 
@@ -50,18 +51,31 @@ class RawTracedFunctionDef(ParsableDef):
 
     description: str = field(default="function", init=False)
 
+    unitary_flags: UnitaryFlags = field(default=UnitaryFlags.NoFlags, kw_only=True)
+
+    metadata: FunctionMetadata | None = field(default=None, kw_only=True)
+
     def parse(self, globals: Globals, sources: SourceMap) -> "TracedFunctionDef":
         """Parses and checks the user-provided signature of the function."""
         func_ast, _docstring = parse_py_func(self.python_func, sources)
-        ty = check_signature(func_ast, globals, self.id)
+        ty = check_signature(
+            func_ast, globals, self.id, unitary_flags=self.unitary_flags
+        )
         if ty.parametrized:
             raise GuppyError(UnsupportedError(func_ast, "Generic comptime functions"))
-        return TracedFunctionDef(self.id, self.name, func_ast, ty, self.python_func)
+        return TracedFunctionDef(
+            self.id,
+            self.name,
+            func_ast,
+            ty,
+            self.python_func,
+            unitary_flags=self.unitary_flags,
+            metadata=self.metadata,
+        )
 
 
 @dataclass(frozen=True)
 class TracedFunctionDef(RawTracedFunctionDef, CallableDef, CompilableDef):
-    python_func: PyFunc
     ty: FunctionType
     defined_at: ast.FunctionDef
 
@@ -96,6 +110,11 @@ class TracedFunctionDef(RawTracedFunctionDef, CallableDef, CompilableDef):
         func_def = module.module_root_builder().define_function(
             self.name, func_type.body.input, func_type.body.output, func_type.params
         )
+        add_metadata(
+            func_def,
+            self.metadata,
+            additional_metadata={"unitary": self.ty.unitary_flags.value},
+        )
         if debug_mode_enabled():
             func_def.metadata[HugrDebugInfo] = make_subprogram_record(
                 self.defined_at, ctx
@@ -107,6 +126,8 @@ class TracedFunctionDef(RawTracedFunctionDef, CallableDef, CompilableDef):
             self.ty,
             self.python_func,
             func_def,
+            unitary_flags=self.unitary_flags,
+            metadata=self.metadata,
         )
 
 
@@ -153,4 +174,11 @@ class CompiledTracedFunctionDef(
         """Compiles the body of the function by tracing it."""
         from guppylang_internals.tracing.function import trace_function
 
-        trace_function(self.python_func, self.ty, self.func_def, ctx, self.defined_at)
+        trace_function(
+            self.python_func,
+            self.ty,
+            self.func_def,
+            ctx,
+            self.defined_at,
+            self,
+        )

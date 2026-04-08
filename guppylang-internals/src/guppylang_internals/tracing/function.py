@@ -15,6 +15,7 @@ from guppylang_internals.checker.core import (
     Variable,
 )
 from guppylang_internals.checker.errors.type_errors import TypeMismatchError
+from guppylang_internals.checker.unitary_checker import BBUnitaryChecker
 from guppylang_internals.compiler.core import CompilerContext, DFContainer
 from guppylang_internals.compiler.expr_compiler import ExprCompiler
 from guppylang_internals.definition.value import CallableDef
@@ -36,12 +37,20 @@ from guppylang_internals.tracing.unpacking import (
     update_packed_value,
 )
 from guppylang_internals.tracing.util import capture_guppy_errors, tracing_except_hook
-from guppylang_internals.tys.ty import FunctionType, InputFlags, type_to_row, unify
+from guppylang_internals.tys.ty import (
+    FunctionType,
+    InputFlags,
+    UnitaryFlags,
+    type_to_row,
+    unify,
+)
 
 if TYPE_CHECKING:
     import ast
 
     from hugr import Wire
+
+    from guppylang_internals.definition.traced import CompiledTracedFunctionDef
 
 
 @dataclass(frozen=True)
@@ -57,13 +66,14 @@ def trace_function(
     builder: DfBase[P],
     ctx: CompilerContext,
     node: AstNode,
+    func_def: "CompiledTracedFunctionDef",
 ) -> None:
     """Kicks off tracing of a function.
 
     Invokes the passed Python callable and constructs the corresponding Hugr using the
     passed builder.
     """
-    state = TracingState(ctx, DFContainer(builder, ctx, {}), node)
+    state = TracingState(ctx, DFContainer(builder, ctx, {}), node, func_def)
     with set_tracing_state(state):
         inputs = [
             unpack_guppy_object(
@@ -174,6 +184,12 @@ def trace_call(func: CallableDef, *args: Any) -> Any:
         ]
         ctx = Context(Globals(DEF_STORE.frames[func.id]), locals, {})
         call_node, ret_ty = func.synthesize_call(arg_exprs, state.node, ctx)
+
+        # Here we check if unitary constraints are respected by the caller
+        unitary_flag = state.function_definition.unitary_flags
+        if unitary_flag != UnitaryFlags.NoFlags:
+            unitary_checker = BBUnitaryChecker()
+            unitary_checker.check([call_node], unitary_flag)
 
     # Compile call
     ret_wire = ExprCompiler(state.ctx).compile(call_node, state.dfg)

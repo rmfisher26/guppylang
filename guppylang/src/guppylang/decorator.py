@@ -182,8 +182,15 @@ class _Guppy:
         def decorator(
             f: Callable[P, T], kwargs: GuppyKwargs
         ) -> GuppyFunctionDefinition[P, T]:
-            _ = _parse_kwargs(kwargs)  # TODO: Pass flags to RawTracedFunctionDef
-            defn = RawTracedFunctionDef(DefId.fresh(), f.__name__, None, f)
+            parsed = _parse_kwargs(kwargs)
+            defn = RawTracedFunctionDef(
+                DefId.fresh(),
+                f.__name__,
+                None,
+                f,
+                unitary_flags=parsed.flags,
+                metadata=parsed.metadata,
+            )
             DEF_STORE.register_def(defn, get_calling_frame())
             return GuppyFunctionDefinition(defn)
 
@@ -395,6 +402,7 @@ class _Guppy:
                 f,
                 unitary_flags=parsed.flags,
                 link_name=parsed.link_name,
+                metadata=parsed.metadata,
             )
             DEF_STORE.register_def(defn, get_calling_frame())
             return GuppyFunctionDefinition(defn)
