@@ -7,6 +7,7 @@ import hugr.build.function as hf
 import hugr.tys as ht
 from hugr import Node, Wire
 from hugr.build.dfg import DefinitionBuilder, OpVar
+from hugr.metadata import HugrDebugInfo
 
 from guppylang_internals.ast_util import AstNode, with_loc
 from guppylang_internals.checker.core import Context, Globals
@@ -19,11 +20,15 @@ from guppylang_internals.checker.func_checker import (
     check_signature,
 )
 from guppylang_internals.compiler.core import CompilerContext, DFContainer
+from guppylang_internals.debug_mode import debug_mode_enabled
 from guppylang_internals.definition.common import (
     CompilableDef,
     ParsableDef,
 )
-from guppylang_internals.definition.function import parse_py_func
+from guppylang_internals.definition.function import (
+    make_subprogram_record,
+    parse_py_func,
+)
 from guppylang_internals.definition.value import (
     CallableDef,
     CallReturnWires,
@@ -91,6 +96,10 @@ class TracedFunctionDef(RawTracedFunctionDef, CallableDef, CompilableDef):
         func_def = module.module_root_builder().define_function(
             self.name, func_type.body.input, func_type.body.output, func_type.params
         )
+        if debug_mode_enabled():
+            func_def.metadata[HugrDebugInfo] = make_subprogram_record(
+                self.defined_at, ctx
+            )
         return CompiledTracedFunctionDef(
             self.id,
             self.name,
@@ -131,9 +140,10 @@ class CompiledTracedFunctionDef(
         func_ty: ht.FunctionType = self.ty.instantiate(type_args).to_hugr(ctx)
         type_args: list[ht.TypeArg] = [arg.to_hugr(ctx) for arg in type_args]
         num_returns = len(type_to_row(self.ty.output))
-        call = dfg.builder.call(
-            self.func_def, *args, instantiation=func_ty, type_args=type_args
-        )
+        with dfg.builder.set_ast_context(node):
+            call = dfg.builder.call(
+                self.func_def, *args, instantiation=func_ty, type_args=type_args
+            )
         return CallReturnWires(
             regular_returns=list(call[:num_returns]),
             inout_returns=list(call[num_returns:]),

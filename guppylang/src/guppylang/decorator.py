@@ -27,7 +27,6 @@ from guppylang_internals.definition.extern import RawExternDef
 from guppylang_internals.definition.function import (
     RawFunctionDef,
 )
-from guppylang_internals.definition.metadata import GuppyMetadata
 from guppylang_internals.definition.overloaded import OverloadedFunctionDef
 from guppylang_internals.definition.parameter import (
     ConstVarDef,
@@ -43,6 +42,7 @@ from guppylang_internals.definition.traced import RawTracedFunctionDef
 from guppylang_internals.definition.ty import TypeDef
 from guppylang_internals.dummy_decorator import _DummyGuppy, sphinx_running
 from guppylang_internals.engine import DEF_STORE
+from guppylang_internals.metadata.common import FunctionMetadata
 from guppylang_internals.span import Loc, SourceMap, Span
 from guppylang_internals.tracing.util import hide_trace
 from guppylang_internals.tys.arg import Argument
@@ -751,7 +751,7 @@ def _with_optional_kwargs(
 
 class ParsedGuppyKwargs(NamedTuple):
     flags: UnitaryFlags
-    metadata: GuppyMetadata
+    metadata: FunctionMetadata
     link_name: str | None
 
 
@@ -770,8 +770,9 @@ def _parse_kwargs(kwargs: GuppyKwargs) -> ParsedGuppyKwargs:
     if kwargs.pop("power", False):
         flags |= UnitaryFlags.Power
 
-    metadata = GuppyMetadata()
-    metadata.max_qubits.value = kwargs.pop("max_qubits", None)
+    metadata = FunctionMetadata()
+    if "max_qubits" in kwargs:
+        metadata.set_max_qubits(kwargs.pop("max_qubits"))
 
     link_name = kwargs.pop("link_name", None)
 

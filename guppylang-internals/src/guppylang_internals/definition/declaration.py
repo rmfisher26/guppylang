@@ -6,12 +6,19 @@ from typing import ClassVar
 from hugr import Node, Wire
 from hugr.build import function as hf
 from hugr.build.dfg import DefinitionBuilder, OpVar
+from hugr.metadata import HugrDebugInfo
 
-from guppylang_internals.ast_util import AstNode, has_empty_body, with_loc, with_type
+from guppylang_internals.ast_util import (
+    AstNode,
+    has_empty_body,
+    with_loc,
+    with_type,
+)
 from guppylang_internals.checker.core import Context, Globals
 from guppylang_internals.checker.expr_checker import check_call, synthesize_call
 from guppylang_internals.checker.func_checker import check_signature
 from guppylang_internals.compiler.core import CompilerContext, DFContainer
+from guppylang_internals.debug_mode import debug_mode_enabled
 from guppylang_internals.definition.common import (
     CheckableGenericDef,
     CompilableDef,
@@ -23,6 +30,7 @@ from guppylang_internals.definition.function import (
     compile_call,
     default_func_link_name,
     load,
+    make_subprogram_record,
     monomorphized_link_name,
     parse_py_func,
 )
@@ -187,6 +195,10 @@ class CheckedFunctionDecl(ParsedFunctionDecl, CompilableDef):
         module: hf.Module = module
 
         node = module.declare_function(self.link_name, self.ty.to_hugr_poly(ctx))
+        if debug_mode_enabled():
+            node.metadata[HugrDebugInfo] = make_subprogram_record(
+                self.defined_at, ctx, is_decl=True
+            )
         return CompiledFunctionDecl(
             id=self.id,
             name=self.name,
@@ -237,4 +249,4 @@ class CompiledFunctionDecl(
     ) -> CallReturnWires:
         """Compiles a call to the function."""
         # Use implementation from function definition.
-        return compile_call(args, dfg, self.ty, self.declaration)
+        return compile_call(args, dfg, self.ty, self.declaration, node)

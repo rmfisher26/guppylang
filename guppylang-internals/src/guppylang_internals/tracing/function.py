@@ -153,7 +153,9 @@ def trace_call(func: CallableDef, *args: Any) -> Any:
     with capture_guppy_errors():
         # Try to turn args into `GuppyObjects`
         args_objs = [
-            guppy_object_from_py(arg, state.dfg.builder, state.node, state.ctx)
+            guppy_object_from_py(
+                arg, state.dfg.builder.raw_builder, state.node, state.ctx
+            )
             for arg in args
         ]
 
@@ -188,7 +190,7 @@ def trace_call(func: CallableDef, *args: Any) -> Any:
                 ty = var.ty
                 inout_wire = state.dfg[var]
                 success = update_packed_value(
-                    arg, GuppyObject(ty, inout_wire), state.dfg.builder
+                    arg, GuppyObject(ty, inout_wire), state.dfg.builder.raw_builder
                 )
                 if not success:
                     # This means the user has passed an object that we cannot update,
@@ -199,4 +201,4 @@ def trace_call(func: CallableDef, *args: Any) -> Any:
                     )
 
     ret_obj = GuppyObject(ret_ty, ret_wire)
-    return unpack_guppy_object(ret_obj, state.dfg.builder)
+    return unpack_guppy_object(ret_obj, state.dfg.builder.raw_builder)

@@ -2,20 +2,23 @@ from collections import defaultdict
 from collections.abc import Sequence
 from contextlib import suppress
 from dataclasses import dataclass
+from pathlib import Path
 from types import FrameType
 from typing import ClassVar, cast
 
 import hugr
 import hugr.build.function as hf
 from hugr import ops
+from hugr.debug_info import DICompileUnit
 from hugr.envelope import ExtensionDesc, GeneratorDesc
 from hugr.ext import Extension, ExtensionRegistry
-from hugr.metadata import HugrGenerator, HugrUsedExtensions
+from hugr.metadata import HugrDebugInfo, HugrGenerator, HugrUsedExtensions
 from hugr.package import ModulePointer, Package
 from semver import Version
 from typing_extensions import assert_never, deprecated
 
 import guppylang_internals
+from guppylang_internals.debug_mode import debug_mode_enabled
 from guppylang_internals.definition.common import (
     CheckableDef,
     CheckableGenericDef,
@@ -38,7 +41,11 @@ from guppylang_internals.error import (
     RequiresMonomorphizationError,
     pretty_errors,
 )
+from guppylang_internals.metadata.debug_info_util import (
+    StringTable,
+)
 from guppylang_internals.span import SourceMap
+from guppylang_internals.tracing.util import get_calling_frame
 from guppylang_internals.tys.arg import ConstArg, TypeArg
 from guppylang_internals.tys.builtin import (
     array_type_def,
@@ -462,13 +469,29 @@ class CompilationEngine:
         # Lower definitions to Hugr
         from guppylang_internals.compiler.core import CompilerContext
 
-        ctx = CompilerContext(graph, set(def_ids))
+        # Set up string tables for metadata serialization. We know that the first entry
+        # in the table is always the file containing the Hugr entrypoint.
+        frame = get_calling_frame()
+        assert frame is not None
+        filename = frame.f_code.co_filename
+
+        ctx = CompilerContext(graph, set(def_ids), StringTable())
         requested_defs = []
         for def_id in def_ids:
             check_entry_point_non_generic(self.get_parsed(def_id))
             requested_defs.append(ctx.build_compiled_def(def_id, type_args=None))
         ctx.iterate_worklist()
         self.compiled = ctx.compiled
+
+        # Add debug info about the module to the root node
+        if debug_mode_enabled():
+            module_info = DICompileUnit(
+                directory=Path.cwd().as_uri(),
+                # We know this file is always the first entry in the file table.
+                filename=ctx.metadata_file_table.get_index(filename),
+                file_table=ctx.metadata_file_table.table,
+            )
+            graph.hugr.module_root.metadata[HugrDebugInfo] = module_info
 
         # Build resolve registry: start with cached base, add any additional
         if self.additional_extensions:
