@@ -240,7 +240,11 @@ class CheckedFunctionDef(ParsedFunctionDef, CompilableDef):
         """
         hugr_ty = self.ty.to_hugr_poly(ctx)
         func_def = module.module_root_builder().define_function(
-            self.link_name, hugr_ty.body.input, hugr_ty.body.output, hugr_ty.params
+            self.link_name,
+            hugr_ty.body.input,
+            hugr_ty.body.output,
+            hugr_ty.params,
+            visibility="Public" if self.id in ctx.exported_defs else "Private",
         )
         add_metadata(
             func_def,

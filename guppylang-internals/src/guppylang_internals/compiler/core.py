@@ -25,7 +25,6 @@ from guppylang_internals.checker.core import (
     Variable,
 )
 from guppylang_internals.definition.common import (
-    CheckedDef,
     CompilableDef,
     CompiledDef,
     DefId,
@@ -88,14 +87,22 @@ class CompilerContext(ToHugrContext):
 
     global_funcs: dict[MonoGlobalConstId, hf.Function]
 
+    #: The definitions that should be exported (i.e. made public) in the Hugr module
+    #: currently being built. For compilation of single entrypoints, this will be just
+    #: that entrypoint, while for compilation of libraries this will contain all
+    #: functions that are part of its public interface.
+    exported_defs: set[DefId]
+
     def __init__(
         self,
         module: DefinitionBuilder[ops.Module],
+        exported_defs: set[DefId],
     ) -> None:
         self.module = module
         self.worklist = {}
         self.compiled = {}
         self.global_funcs = {}
+        self.exported_defs: set[DefId] = exported_defs
 
     def build_compiled_def(self, def_id: DefId, type_args: Inst | None) -> CompiledDef:
         """Returns the compiled definitions corresponding to the given ID.
@@ -111,15 +118,7 @@ class CompilerContext(ToHugrContext):
             self.worklist[def_id, mono_args] = None
         return self.compiled[def_id, mono_args]
 
-    def compile(self, defn: CheckedDef, mono_args: Inst) -> CompiledDef:
-        """Compiles the given definition and all of its dependencies into the current
-        Hugr."""
-        # Check and compile the entry point
-        entry_compiled = self.build_compiled_def(defn.id, mono_args)
-        self.compiled[defn.id, mono_args] = entry_compiled
-        self.worklist[defn.id, mono_args] = None
-
-        # Compile definition bodies
+    def iterate_worklist(self) -> None:
         while self.worklist:
             next_id, next_mono_args = self.worklist.popitem()[0]
             next_def = self.compiled[next_id, next_mono_args]
@@ -130,8 +129,6 @@ class CompilerContext(ToHugrContext):
         # TODO: This is a quick workaround until we can properly insert these drops
         # during linearity checking. See https://github.com/quantinuum/guppylang/issues/1082
         insert_drops(self.module.hugr)
-
-        return entry_compiled
 
     def build_compiled_instance_func(
         self,

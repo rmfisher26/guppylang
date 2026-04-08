@@ -369,20 +369,30 @@ class CompilationEngine:
         return None
 
     @pretty_errors
-    def check(self, id: DefId) -> None:
+    def check_single(self, id: DefId) -> None:
         """Top-level function to kick of checking of a definition.
 
         This is the main driver behind `guppy.check()`.
         """
+        self.check([id])
+
+    @pretty_errors
+    def check(self, def_ids: list[DefId], *, reset: bool = True) -> None:
+        """Top-level function to kick of checking of multiple definitions.
+
+        This is the main driver behind `guppy.library(...).check()`.
+        """
         # Clear previous compilation cache.
         # TODO: In order to maintain results from the previous `check` call we would
         #  need to store and check if any dependencies have changed.
-        self.reset()
+        if reset:
+            self.reset()
 
-        entry_defn = self.get_parsed(id)
-        check_entry_point_non_generic(entry_defn)
-        entry_mono_args: Inst = ()
-        self.to_check_worklist[id, entry_mono_args] = entry_defn
+        for def_id in def_ids:
+            entry_defn = self.get_parsed(def_id)
+            check_entry_point_non_generic(entry_defn)
+            entry_mono_args: Inst = ()
+            self.to_check_worklist[def_id, entry_mono_args] = entry_defn
 
         while (
             self.types_to_check_worklist
@@ -413,12 +423,37 @@ class CompilationEngine:
                 self.checked[id, mono_args] = self.get_checked(id, mono_args)
 
     @pretty_errors
-    def compile(self, id: DefId) -> ModulePointer:
-        """Top-level function to kick of Hugr compilation of a definition.
+    def compile_single(self, id: DefId) -> ModulePointer:
+        """Top-level function to begin compilation of a definition into a Hugr module.
 
-        This is the function that is invoked by `guppy.compile`.
+        This is the function that is invoked by e.g. `<guppy-definition>.compile`.
         """
-        self.check(id)
+        pointer, [compiled_def] = self._compile([id])
+
+        if (
+            isinstance(compiled_def, CompiledHugrNodeDef)
+            and isinstance(compiled_def, CompiledCallableDef)
+            and not isinstance(pointer.module[compiled_def.hugr_node].op, ops.FuncDecl)
+        ):
+            # if compiling a region set it as the HUGR entrypoint can be
+            # loosened after https://github.com/quantinuum/hugr/issues/2501 is fixed
+            pointer.module.entrypoint = compiled_def.hugr_node
+
+        return pointer
+
+    @pretty_errors
+    def compile(self, def_ids: list[DefId], *, reset: bool = True) -> ModulePointer:
+        """Top-level function to begin compilation of a range of definitions into a Hugr
+        module.
+
+        This is the function that is invoked by e.g. `<guppy-library>.compile`.
+        """
+        return self._compile(def_ids, reset=reset)[0]
+
+    def _compile(
+        self, def_ids: list[DefId], *, reset: bool = True
+    ) -> tuple[ModulePointer, list[CompiledDef]]:
+        self.check(def_ids, reset=reset)
 
         # Prepare Hugr for this module
         graph = hf.Module()
@@ -427,20 +462,13 @@ class CompilationEngine:
         # Lower definitions to Hugr
         from guppylang_internals.compiler.core import CompilerContext
 
-        ctx = CompilerContext(graph)
-        check_entry_point_non_generic(self.get_parsed(id))
-        entry_mono_args: Inst = ()
-        compiled_def = ctx.compile(self.checked[id, entry_mono_args], entry_mono_args)
+        ctx = CompilerContext(graph, set(def_ids))
+        requested_defs = []
+        for def_id in def_ids:
+            check_entry_point_non_generic(self.get_parsed(def_id))
+            requested_defs.append(ctx.build_compiled_def(def_id, type_args=None))
+        ctx.iterate_worklist()
         self.compiled = ctx.compiled
-
-        if (
-            isinstance(compiled_def, CompiledHugrNodeDef)
-            and isinstance(compiled_def, CompiledCallableDef)
-            and not isinstance(graph.hugr[compiled_def.hugr_node].op, ops.FuncDecl)
-        ):
-            # if compiling a region set it as the HUGR entrypoint can be
-            # loosened after https://github.com/quantinuum/hugr/issues/2501 is fixed
-            graph.hugr.entrypoint = compiled_def.hugr_node
 
         # Build resolve registry: start with cached base, add any additional
         if self.additional_extensions:
@@ -484,8 +512,11 @@ class CompilationEngine:
             for ext in used_extensions_result.used_extensions.extensions
             if ext.name not in std_ext_names
         ]
-        return ModulePointer(
-            Package(modules=[graph.hugr], extensions=packaged_extensions), 0
+        return (
+            ModulePointer(
+                Package(modules=[graph.hugr], extensions=packaged_extensions), 0
+            ),
+            requested_defs,
         )
 
 
