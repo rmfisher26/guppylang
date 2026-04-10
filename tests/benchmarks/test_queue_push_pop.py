@@ -3,7 +3,7 @@ from guppylang.std.collections import Queue, empty_queue
 
 
 @guppy
-def queue_pop_benchmark() -> int:
+def queue_push_pop_benchmark() -> int:
     q: Queue[int, 10000] = empty_queue()
     for i in range(10000):
         q = q.push(i)
@@ -14,9 +14,9 @@ def queue_pop_benchmark() -> int:
     return total
 
 
-def test_queue_pop_benchmark(benchmark):
+def test_queue_push_pop_benchmark(benchmark):
     def run():
         # Run the benchmark function (no args) in the emulator with a simple simulator
-        return queue_pop_benchmark.emulator(0).coinflip_sim().with_seed(42).run()
+        return queue_push_pop_benchmark.emulator(0).coinflip_sim().with_seed(42).run()
 
     benchmark(run)
