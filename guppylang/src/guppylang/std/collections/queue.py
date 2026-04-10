@@ -19,30 +19,35 @@ MAX_SIZE = guppy.nat_var("MAX_SIZE")
 class Queue(Generic[T, MAX_SIZE]):  # type: ignore[misc]
     """A first-in-first-out (FIFO) growable collection of values.
 
-    To ensure static allocation, the maximum queue size must be specified in advance and
-    is tracked in the type. For example, the `Queue[int, 10]` is a queue that can hold
-    at most 10 integers.
+    To ensure static allocation, the maximum queue size must be specified in advance
+    and is tracked in the type. For example, `Queue[int, 10]` is a queue that can
+    hold at most 9 integers.
+
+    Implemented as a circular buffer, giving O(1) push and pop. One slot is reserved
+    as a sentinel to distinguish full from empty, giving an effective capacity of
+    MAX_SIZE - 1.
 
     Use `empty_queue` to construct a new queue.
     """
 
-    #: Underlying buffer holding the queue elements.
+    #: Underlying circular buffer holding the queue elements.
     #:
-    #: INVARIANT: All array elements up to and including index `self.end - 1` are
-    #: `option.some` variants and all further ones are `option.nothing`.
+    #: Elements are stored contiguously from `self.start` up to but not
+    #: including `self.end`, wrapping around modulo MAX_SIZE. The slot at `self.end`
+    #: is always kept empty as a sentinel. All other slots are `option.nothing`.
     buf: array[Option[T], MAX_SIZE]  # type: ignore[valid-type, type-arg]
     #: Index of the current front of the queue (first element to be popped).
     start: int
-    #: Index of the next free index in `self.buf`.
+    #: Index of the next free slot in `self.buf`.
     end: int
-    #: Number of elements currently stored in the queue.
-    size: int
 
     @guppy
     @no_type_check
     def __len__(self: Queue[T, MAX_SIZE]) -> int:
         """Returns the number of elements currently stored in the queue."""
-        return self.size
+        if self.end >= self.start:
+            return self.end - self.start
+        return self.end - self.start + MAX_SIZE
 
     @guppy
     @no_type_check
@@ -68,11 +73,11 @@ class Queue(Generic[T, MAX_SIZE]):  # type: ignore[misc]
 
         Panics if the queue has already reached its maximum size.
         """
-        if self.size >= MAX_SIZE:
+        if (self.end + 1) % MAX_SIZE == self.start:
             panic("Queue.push: max size reached")
         self.buf[self.end].swap(some(elem)).unwrap_nothing()
         new_end = (self.end + 1) % MAX_SIZE
-        return Queue(self.buf, self.start, new_end, self.size + 1)
+        return Queue(self.buf, self.start, new_end)
 
     @guppy
     @no_type_check
@@ -82,11 +87,11 @@ class Queue(Generic[T, MAX_SIZE]):  # type: ignore[misc]
 
         Panics if the queue is empty.
         """
-        if self.size == 0:
+        if self.start == self.end:
             panic("Queue.pop: queue is empty")
         elem = self.buf[self.start].take().unwrap()
         new_start = (self.start + 1) % MAX_SIZE
-        return elem, Queue(self.buf, new_start, self.end, self.size - 1)
+        return elem, Queue(self.buf, new_start, self.end)
 
     @guppy
     @no_type_check
@@ -99,10 +104,10 @@ class Queue(Generic[T, MAX_SIZE]):  # type: ignore[misc]
 
         Note that this operation is only allowed if the queue elements are copyable.
         """
-        if self.size == 0:
+        if self.start == self.end:
             panic("Queue.peek: queue is empty")
         elem = self.buf[self.start].unwrap()
-        return elem, Queue(self.buf, self.start, self.end, self.size)
+        return elem, Queue(self.buf, self.start, self.end)
 
     @guppy
     @no_type_check
@@ -112,7 +117,7 @@ class Queue(Generic[T, MAX_SIZE]):  # type: ignore[misc]
 
         Panics if the queue is not empty.
         """
-        if self.size != 0:
+        if self.start != self.end:
             panic("Queue.discard_empty: queue is not empty")
         for elem in self.buf:
             elem.unwrap_nothing()
@@ -123,4 +128,4 @@ class Queue(Generic[T, MAX_SIZE]):  # type: ignore[misc]
 def empty_queue() -> Queue[T, MAX_SIZE]:
     """Constructs a new empty queue."""
     buf = array(nothing[T]() for _ in range(MAX_SIZE))
-    return Queue(buf, 0, 0, 0)
+    return Queue(buf, 0, 0)
